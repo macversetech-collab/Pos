@@ -69,16 +69,15 @@ class CatalogRepository {
 
   Future<CatalogSnapshot?> _performRemoteRefresh() async {
     try {
+      // Fetch the required catalog tables before changing the snapshot.
       final sizesResponse = await _supabase.from('cake_sizes').select();
       final itemsResponse = await _supabase.from('cake_items').select();
-      final variantsResponse = await _supabase.from('variants').select();
 
       final sizes = List<Map<String, dynamic>>.from(sizesResponse as List);
       final items = List<Map<String, dynamic>>.from(itemsResponse as List);
-      final variants = List<Map<String, dynamic>>.from(
-        variantsResponse as List,
-      );
 
+      // Sizes and items are required for a usable Sale catalog. Never replace
+      // a valid snapshot with an empty or incomplete network response.
       if (sizes.isEmpty || items.isEmpty) {
         debugPrint(
           'CatalogRepository: Ignoring empty/incomplete remote catalog.',
@@ -87,9 +86,17 @@ class CatalogRepository {
       }
 
       final cachedVariants = _box.get(_variantsKey);
-      final variantsToStore = variants.isNotEmpty || cachedVariants == null
-          ? variants
-          : cachedVariants;
+      dynamic variantsToStore = cachedVariants ?? <Map<String, dynamic>>[];
+      try {
+        final variantsResponse = await _supabase.from('variants').select();
+        variantsToStore = List<Map<String, dynamic>>.from(
+          variantsResponse as List,
+        );
+      } catch (e) {
+        debugPrint(
+          'CatalogRepository: Optional variants refresh failed; preserving cache: $e',
+        );
+      }
 
       await _box.putAll({
         _sizesKey: sizes,

@@ -1,0 +1,34 @@
+name: ash_bakery_apk
+description: "A new Flutter project."
+publish_to: 'none'
+version: 1.0.8+9
+
+environment:
+  sdk: '>=3.9.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  google_fonts: ^6.2.1
+  table_calendar: ^3.1.3
+  lucide_icons: ^0.257.0
+  supabase_flutter: ^2.8.0
+  print_bluetooth_thermal: ^1.2.2
+  esc_pos_utils_plus: ^2.0.4
+  hive_flutter: ^1.1.0
+  connectivity_plus: ^7.2.0
+  package_info_plus: ^8.2.1
+  screenshot: ^3.0.0
+  image: ^4.8.0
+  gal: ^2.3.2
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+  hive: ^2.2.3
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/logo.png

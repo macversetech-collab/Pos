@@ -1,0 +1,132 @@
+                    title: '4. Deposit & Payment Ledger',
+                    icon: Icons.payments_outlined,
+                    children: [
+                      if (isCompact) ...[
+                        AnchoredDropdown<String>(
+                          initialValue: _paymentStatus,
+                          decoration: AppDecorations.input(
+                            labelText: 'Payment Status',
+                          ),
+                          onChanged: (val) {
+                            if (val != null) {
+                              setState(() {
+                                _paymentStatus = val;
+                                if (val == 'fully_paid') {
+                                  _depositPaid = liveTotal;
+                                }
+                              });
+                            }
+                          },
+                          items: const [
+                            DropdownMenuItem(
+                              value: 'deposit',
+                              child: Text('စရံပေး'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'fully_paid',
+                              child: Text('ရှင်းပြီး'),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          key: ValueKey(
+                            'deposit-paid-$_paymentStatus-$liveTotal-v',
+                          ),
+                          initialValue: _depositPaid > 0
+                              ? _depositPaid.toString()
+                              : '',
+                          enabled: _paymentStatus == 'deposit',
+                          keyboardType: TextInputType.number,
+                          decoration: AppDecorations.input(
+                            labelText: 'Deposit Amount (စရံငွေပမာဏ)',
+                          ),
+                          onChanged: (val) {
+                            setState(() {
+                              _depositPaid = int.tryParse(val) ?? 0;
+                            });
+                          },
+                        ),
+                      ] else ...[
+                        Row(
+                          children: [
+                            Expanded(
+                              child: AnchoredDropdown<String>(
+                                initialValue: _paymentStatus,
+                                decoration: AppDecorations.input(
+                                  labelText: 'Payment Status',
+                                ),
+                                onChanged: (val) {
+                                  if (val != null) {
+                                    setState(() {
+                                      _paymentStatus = val;
+                                      if (val == 'fully_paid') {
+                                        _depositPaid = liveTotal;
+                                      }
+                                    });
+                                  }
+                                },
+                                items: const [
+                                  DropdownMenuItem(
+                                    value: 'deposit',
+                                    child: Text('စရံပေး'),
+                                  ),
+                                  DropdownMenuItem(
+                                    value: 'fully_paid',
+                                    child: Text('ရှင်းပြီး'),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: TextFormField(
+                                key: ValueKey(
+                                  'deposit-paid-$_paymentStatus-$liveTotal-h',
+                                ),
+                                initialValue: _depositPaid > 0
+                                    ? _depositPaid.toString()
+                                    : '',
+                                enabled: _paymentStatus == 'deposit',
+                                keyboardType: TextInputType.number,
+                                decoration: AppDecorations.input(
+                                  labelText: 'Deposit Amount (စရံငွေပမာဏ)',
+                                ),
+                                onChanged: (val) {
+                                  setState(() {
+                                    _depositPaid = int.tryParse(val) ?? 0;
+                                  });
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                      const SizedBox(height: 12),
+                      AnchoredDropdown<String>(
+                        initialValue: _isKpay ? 'Kpay' : 'Cash',
+                        decoration: AppDecorations.input(
+                          labelText: 'Payment Method',
+                        ),
+                        onChanged: (val) {
+                          if (val != null) {
+                            setState(() {
+                              _isKpay = (val == 'Kpay');
+                            });
+                          }
+                        },
+                        items: const [
+                          DropdownMenuItem(value: 'Cash', child: Text('Cash')),
+                          DropdownMenuItem(value: 'Kpay', child: Text('Kpay')),
+                        ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                ],
+              ),
+            ),
+          ),
+
+          // FLOATING ACTION PILL
+            Align(

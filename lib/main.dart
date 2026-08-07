@@ -10,6 +10,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'app_theme.dart';
 import 'models.dart';
 import 'services/order_repository.dart';
+import 'services/catalog_repository.dart';
 import 'services/print_queue_manager.dart';
 import 'tabs/calendar_tab.dart';
 import 'tabs/dashboard_tab.dart';
@@ -34,6 +35,7 @@ void main() async {
     publishableKey: 'sb_publishable_K_Siqrx9gXE9T22kpUOdHQ_ZI66dB45',
   );
   await OrderRepository().init();
+  await CatalogRepository().init();
   await VoucherRepository().init();
   await PrintQueueManager().init();
   await AuthService().init();
@@ -236,7 +238,8 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   void initState() {
     super.initState();
     _seedInitialMockOrders();
-    _fetchCatalogData();
+    _loadCachedCatalogData();
+    unawaited(_fetchCatalogData());
     _initConnectivityListener();
     _loadPrinterSettings();
   }
@@ -276,43 +279,23 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   }
 
   Future<void> _fetchCatalogData() async {
-    try {
-      final sizesRes = await Supabase.instance.client
-          .from('cake_sizes')
-          .select();
-      final itemsRes = await Supabase.instance.client
-          .from('cake_items')
-          .select();
+    final refreshed = await CatalogRepository().refreshFromRemote();
+    if (refreshed == null || !mounted) return;
+    _applyCatalog(refreshed);
+  }
 
-      final List<CakeSize> loadedSizes = (sizesRes as List).map((row) {
-        return CakeSize(
-          id: row['id'] as String,
-          name: row['name'] as String,
-          basePrice: row['base_price'] as int,
-        );
-      }).toList();
+  void _loadCachedCatalogData() {
+    final cached = CatalogRepository().getCachedCatalog();
+    if (cached.sizes.isEmpty || cached.items.isEmpty) return;
+    _applyCatalog(cached);
+  }
 
-      final List<CakeItem> loadedItems = (itemsRes as List).map((row) {
-        return CakeItem(
-          id: row['id'] as String,
-          name: row['name'] as String,
-          sizes: List<String>.from(row['sizes'] as List),
-          variants: List<String>.from(row['variants'] as List),
-          pricing: Map<String, int>.from(
-            (row['pricing'] as Map).map(
-              (k, v) => MapEntry(k as String, v as int),
-            ),
-          ),
-        );
-      }).toList();
-
-      setState(() {
-        _sizes = loadedSizes;
-        _items = loadedItems;
-      });
-    } catch (e) {
-      debugPrint('Error fetching catalog: $e');
-    }
+  void _applyCatalog(CatalogSnapshot catalog) {
+    if (!mounted) return;
+    setState(() {
+      _sizes = catalog.sizes;
+      _items = catalog.items;
+    });
   }
 
   void _seedInitialMockOrders() {

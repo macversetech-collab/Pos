@@ -2,8 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'dart:ui';
 import 'dart:async';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../app_theme.dart';
+import '../services/catalog_repository.dart';
 import '../services/order_repository.dart';
 import '../models.dart';
 import '../widgets/scale_button.dart';
@@ -139,20 +139,32 @@ class _OrderEntryFormTabState extends State<OrderEntryFormTab> {
     if (_variantCache.containsKey(cacheKey)) {
       return _variantCache[cacheKey]!;
     }
-    try {
-      final res = await Supabase.instance.client
-          .from('variants')
-          .select()
-          .eq('item_id', itemId)
-          .eq('size', size);
-      final results = List<Map<String, dynamic>>.from(res as List);
+
+    final cached = CatalogRepository().getCachedVariants(itemId, size);
+    if (cached.isNotEmpty) {
       setState(() {
-        _variantCache[cacheKey] = results;
+        _variantCache[cacheKey] = cached;
       });
-      return results;
-    } catch (e) {
-      debugPrint('Error fetching variants for $itemId/$size: $e');
-      return [];
+    }
+
+    unawaited(_refreshVariantsInBackground(itemId, size, cacheKey));
+    return cached;
+  }
+
+  Future<void> _refreshVariantsInBackground(
+    String itemId,
+    String size,
+    String cacheKey,
+  ) async {
+    final refreshed = await CatalogRepository().refreshFromRemote();
+    if (refreshed == null || !mounted) return;
+
+    final variants = CatalogRepository().getCachedVariants(itemId, size);
+    if (variants.isNotEmpty) {
+      setState(() {
+        _variantCache[cacheKey] = variants;
+      });
+      calculateTotalPrice();
     }
   }
 

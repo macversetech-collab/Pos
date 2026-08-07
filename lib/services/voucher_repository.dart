@@ -56,7 +56,8 @@ class VoucherRepository {
             .select()
             .eq('order_id', orderId)
             .eq('voucher_type', voucherType)
-            .maybeSingle();
+            .maybeSingle()
+            .timeout(const Duration(seconds: 5));
 
         if (res != null) {
           final existingVoucher = Voucher.fromMap(res);
@@ -94,7 +95,7 @@ class VoucherRepository {
         final res = await _supabase.from('vouchers').upsert(
           newVoucher.toMap(),
           onConflict: 'order_id,voucher_type',
-        ).select().single();
+        ).select().single().timeout(const Duration(seconds: 5));
 
         final persistedVoucher = Voucher.fromMap(res);
         await _localBox.put(cacheKey, persistedVoucher.toMap());

@@ -105,7 +105,8 @@ class OrderRepository {
         final List res = await _supabase
             .from('orders')
             .select('order_number')
-            .gte('delivery_date', todayStart);
+            .gte('delivery_date', todayStart)
+            .timeout(const Duration(seconds: 5));
         for (var row in res) {
           final String? remoteNum = row['order_number'] as String?;
           if (remoteNum != null && remoteNum.isNotEmpty) {
@@ -399,7 +400,7 @@ class OrderRepository {
       await _supabase.from('orders').upsert(
         remoteData,
         onConflict: 'order_number',
-      );
+      ).timeout(const Duration(seconds: 5));
 
       // Update local storage flag to true
       final localData = Map<String, dynamic>.from(orderData);

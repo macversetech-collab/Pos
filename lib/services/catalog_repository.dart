@@ -85,18 +85,11 @@ class CatalogRepository {
         return null;
       }
 
-      final cachedVariants = _box.get(_variantsKey);
-      dynamic variantsToStore = cachedVariants ?? <Map<String, dynamic>>[];
-      try {
-        final variantsResponse = await _supabase.from('variants').select();
-        variantsToStore = List<Map<String, dynamic>>.from(
-          variantsResponse as List,
-        );
-      } catch (e) {
-        debugPrint(
-          'CatalogRepository: Optional variants refresh failed; preserving cache: $e',
-        );
-      }
+      final requiredCatalog = CatalogSnapshot(
+        sizes: _readSizes(sizes),
+        items: _readItems(items),
+      );
+      final variantsToStore = await _fetchOptionalVariants();
 
       await _box.putAll({
         _sizesKey: sizes,
@@ -105,13 +98,23 @@ class CatalogRepository {
         _refreshedAtKey: DateTime.now().toUtc().toIso8601String(),
       });
 
-      return CatalogSnapshot(
-        sizes: _readSizes(sizes),
-        items: _readItems(items),
-      );
+      return requiredCatalog;
     } catch (e) {
       debugPrint('CatalogRepository: Remote refresh failed: $e');
       return null;
+    }
+  }
+
+  Future<dynamic> _fetchOptionalVariants() async {
+    final cachedVariants = _box.get(_variantsKey);
+    try {
+      final variantsResponse = await _supabase.from('variants').select();
+      return List<Map<String, dynamic>>.from(variantsResponse as List);
+    } catch (e) {
+      debugPrint(
+        'CatalogRepository: Optional variants refresh failed; preserving cache: $e',
+      );
+      return cachedVariants ?? <Map<String, dynamic>>[];
     }
   }
 

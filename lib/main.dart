@@ -25,6 +25,7 @@ import 'package:screenshot/screenshot.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'services/auth_service.dart';
 import 'services/voucher_repository.dart';
+import 'services/closure_repository.dart';
 import 'screens/login_screen.dart';
 import 'widgets/app_version_widget.dart';
 
@@ -39,6 +40,7 @@ void main() async {
   await VoucherRepository().init();
   await PrintQueueManager().init();
   await AuthService().init();
+  await ClosureRepository().init();
   runApp(const SweetBloomApp());
 }
 

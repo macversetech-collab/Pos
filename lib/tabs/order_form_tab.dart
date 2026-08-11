@@ -5,6 +5,7 @@ import 'dart:async';
 import '../app_theme.dart';
 import '../services/catalog_repository.dart';
 import '../services/order_repository.dart';
+import '../services/closure_repository.dart';
 import '../models.dart';
 import '../widgets/scale_button.dart';
 import '../widgets/anchored_dropdown.dart';
@@ -1075,6 +1076,59 @@ class _OrderEntryFormTabState extends State<OrderEntryFormTab> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // --- SHOP CLOSURE BANNER ---
+                  Builder(
+                    builder: (context) {
+                      final closure = ClosureRepository().getClosureForDate(_deliveryDate);
+                      if (closure == null) return const SizedBox.shrink();
+                      
+                      final start = closure['start_time'] ?? '';
+                      final end = closure['end_time'] ?? '';
+                      final reason = closure['reason'] ?? '';
+                      
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 16.0),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFF0F0),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.redAccent.withValues(alpha: 0.3)),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(Icons.warning_amber_rounded, color: Colors.redAccent),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'SHOP CLOSED NOTICE',
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.redAccent,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    '${formatDateToDDMMYY(_deliveryDate)}\n$start - $end\n$reason',
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      color: Color(0xFF2D241E),
+                                      height: 1.4,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+
                   // App title indicator
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,

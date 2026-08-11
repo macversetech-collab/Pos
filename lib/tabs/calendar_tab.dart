@@ -6,6 +6,7 @@ import '../core/realtime/realtime_manager.dart';
 import '../app_theme.dart';
 import '../models.dart';
 import '../services/order_repository.dart';
+import '../services/closure_repository.dart';
 import '../widgets/anchored_dropdown.dart';
 import '../widgets/scale_button.dart';
 import '../widgets/digital_voucher_dialog.dart';
@@ -1482,6 +1483,23 @@ class _CalendarTabState extends State<CalendarTab> {
                             ),
                         ],
                       ),
+                      if (ClosureRepository().getClosureForDate(formattedDate) != null)
+                        Container(
+                          margin: const EdgeInsets.only(top: 4),
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.redAccent,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text(
+                            'CLOSED',
+                            style: TextStyle(
+                              fontSize: 7,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
                     ],
                   ),
                 ),

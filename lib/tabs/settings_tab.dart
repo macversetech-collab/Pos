@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../app_theme.dart';
 import '../models.dart';
 import '../widgets/anchored_dropdown.dart';
+import '../services/closure_repository.dart';
 
 class SettingsTab extends StatefulWidget {
   final List<CakeSize> sizes;
@@ -44,11 +45,33 @@ class _SettingsTabState extends State<SettingsTab> {
   final TextEditingController _sizePriceController = TextEditingController();
   final TextEditingController _itemNameController = TextEditingController();
 
+  List<Map<dynamic, dynamic>> _closures = [];
+  final TextEditingController _closureDateController = TextEditingController();
+  final TextEditingController _closureStartTimeController = TextEditingController();
+  final TextEditingController _closureEndTimeController = TextEditingController();
+  final TextEditingController _closureReasonController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadClosures();
+  }
+
+  void _loadClosures() {
+    setState(() {
+      _closures = ClosureRepository().getAllCachedClosures();
+    });
+  }
+
   @override
   void dispose() {
     _sizeNameController.dispose();
     _sizePriceController.dispose();
     _itemNameController.dispose();
+    _closureDateController.dispose();
+    _closureStartTimeController.dispose();
+    _closureEndTimeController.dispose();
+    _closureReasonController.dispose();
     super.dispose();
   }
 
@@ -374,6 +397,175 @@ class _SettingsTabState extends State<SettingsTab> {
                     style: TextStyle(fontWeight: FontWeight.bold),
                   ),
                 ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // 4. SHOP CLOSURE CONFIG CARD
+          _buildCard(
+            title: 'Shop Closures & Holidays',
+            badgeText: '${_closures.length} CLOSURES',
+            children: [
+              if (_closures.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 8.0),
+                  child: Text(
+                    'No shop closures scheduled.',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontStyle: FontStyle.italic,
+                      color: Colors.grey,
+                    ),
+                  ),
+                )
+              else
+                ..._closures.map((closure) {
+                  final date = closure['date'] ?? '';
+                  final start = closure['start_time'] ?? '';
+                  final end = closure['end_time'] ?? '';
+                  final reason = closure['reason'] ?? '';
+                  return Container(
+                    margin: const EdgeInsets.only(bottom: 8.0),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12.0),
+                      border: Border.all(color: const Color(0xFFEAE7E2), width: 1.2),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '$date ($start - $end)',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF2D241E),
+                                ),
+                              ),
+                              if (reason.isNotEmpty)
+                                Text(
+                                  reason,
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    color: Color(0xFF8C7E6A),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(
+                            Icons.delete_outline_rounded,
+                            color: Colors.redAccent,
+                            size: 18,
+                          ),
+                          onPressed: () async {
+                            final success = await ClosureRepository().deleteClosure(closure['id'], date);
+                            if (success) _loadClosures();
+                          },
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+              const SizedBox(height: 12),
+              
+              Row(
+                children: [
+                  Expanded(
+                    flex: 2,
+                    child: TextFormField(
+                      controller: _closureDateController,
+                      decoration: AppDecorations.input(
+                        hintText: 'YYYY-MM-DD',
+                        filled: true,
+                        fillColor: const Color(0xFFFAF9F6),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    flex: 2,
+                    child: TextFormField(
+                      controller: _closureStartTimeController,
+                      decoration: AppDecorations.input(
+                        hintText: 'Start (e.g. 09:00 AM)',
+                        filled: true,
+                        fillColor: const Color(0xFFFAF9F6),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    flex: 2,
+                    child: TextFormField(
+                      controller: _closureEndTimeController,
+                      decoration: AppDecorations.input(
+                        hintText: 'End (e.g. 05:00 PM)',
+                        filled: true,
+                        fillColor: const Color(0xFFFAF9F6),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _closureReasonController,
+                      decoration: AppDecorations.input(
+                        hintText: 'Reason (e.g. Holiday)',
+                        filled: true,
+                        fillColor: const Color(0xFFFAF9F6),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF2D241E),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    onPressed: () async {
+                      final date = _closureDateController.text.trim();
+                      final start = _closureStartTimeController.text.trim();
+                      final end = _closureEndTimeController.text.trim();
+                      final reason = _closureReasonController.text.trim();
+                      if (date.isNotEmpty && start.isNotEmpty && end.isNotEmpty) {
+                        final success = await ClosureRepository().addClosure(
+                          date: date,
+                          startTime: start,
+                          endTime: end,
+                          reason: reason,
+                        );
+                        if (success) {
+                          _closureDateController.clear();
+                          _closureStartTimeController.clear();
+                          _closureEndTimeController.clear();
+                          _closureReasonController.clear();
+                          _loadClosures();
+                        }
+                      }
+                    },
+                    child: const Text(
+                      '+ ADD',
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                ],
               ),
             ],
           ),

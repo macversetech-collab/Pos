@@ -1,7 +1,7 @@
 name: ash_bakery_apk
 description: "A new Flutter project."
 publish_to: 'none'
-version: 1.0.9+12
+version: 1.0.10+13
 
 environment:
   sdk: '>=3.9.0 <4.0.0'

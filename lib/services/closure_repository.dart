@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
+import 'dart:math';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-
 class ClosureRepository {
   static const String _boxName = 'closures_cache';
   final SupabaseClient _supabase = Supabase.instance.client;
@@ -71,15 +71,19 @@ class ClosureRepository {
     }
   }
 
-  /// Adds a new closure to Supabase and updates local cache
-  Future<bool> addClosure({
+  Future<String?> addClosure({
     required String date,
     required String startTime,
     required String endTime,
     String reason = '',
   }) async {
     try {
+      final random = Random();
+      String hex(int length) => List.generate(length, (_) => random.nextInt(16).toRadixString(16)).join();
+      final localId = '${hex(8)}-${hex(4)}-4${hex(3)}-a${hex(3)}-${hex(12)}';
+
       final insertData = {
+        'id': localId,
         'date': date,
         'start_time': startTime,
         'end_time': endTime,
@@ -95,10 +99,10 @@ class ClosureRepository {
         'end_time': res['end_time'],
         'reason': res['reason'],
       });
-      return true;
+      return null;
     } catch (e) {
       debugPrint('Error adding closure: $e');
-      return false;
+      return e.toString();
     }
   }
 

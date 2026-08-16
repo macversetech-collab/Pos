@@ -1215,116 +1215,57 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     );
   }
 
-  Future<void> _handleOrderSubmit(Order submitted) async {
-    final bool isEdit = _editingOrder != null;
-
-    // Idempotency guard: prevent processing the same order ID twice for NEW orders
-    if (!isEdit) {
-      debugPrint('CREATE ORDER START: ${submitted.id}');
-      if (_submittedOrderIds.contains(submitted.id)) {
-        debugPrint('DUPLICATE SUBMIT BLOCKED: ${submitted.id} — already processed this session');
-        return;
-      }
-      _submittedOrderIds.add(submitted.id);
-    } else {
-      debugPrint('EDIT ORDER START: ${submitted.id}');
+  /// Persists a confirmed order to Hive + Supabase, creates the voucher record,
+  /// and updates in-memory state. Called only when the user actually confirms
+  /// (Print or No Print) — never during preview or cancel.
+  Future<bool> _persistConfirmedOrder(Order submitted, Map<String, dynamic> orderMap, bool isEdit) async {
+    // Idempotency: once persisted, block duplicate calls for the same order
+    if (!isEdit && _submittedOrderIds.contains(submitted.id)) {
+      debugPrint('DUPLICATE PERSIST BLOCKED: ${submitted.id}');
+      return true; // already saved — treat as success
     }
 
-    debugPrint('DEBUG main->DB _handleOrderSubmit: size="${submitted.size}", phone="${submitted.customerPhone}", lettering="${submitted.customLettering}", instructions="${submitted.specialInstructions}"');
-
     try {
-      final orderMap = {
-        'id': submitted.id,
-        'order_number': submitted.orderNumber,
-        'delivery_date': submitted.deliveryDate,
-        'delivery_time': submitted.deliveryTime,
-        'item_id': submitted.itemId,
-        'size': submitted.size,
-        'variant': submitted.variant,
-        'design_code': submitted.designCode,
-        'custom_name': submitted.customName,
-        'custom_age': submitted.customAge,
-        'custom_date': submitted.customDate,
-        'custom_lettering': submitted.customLettering,
-        'special_instructions': submitted.specialInstructions,
-        'customer_phone': submitted.customerPhone,
-        'payment_status': submitted.paymentStatus,
-        'deposit_paid': submitted.depositPaid,
-        'remaining_balance': submitted.remainingBalance,
-        'is_kpay': submitted.isKpay,
-        'total_amount': submitted.totalAmount,
-        'toys_cost': submitted.toysCost,
-        'money_pulling_cost': submitted.moneyPullingCost,
-        'money_pulling_note': submitted.moneyPullingNote,
-        'delivery_cost': submitted.deliveryCost,
-        'order_from': submitted.orderFrom,
-        'created_at': submitted.createdAt.toUtc().toIso8601String(),
-        'print_count': submitted.printCount,
-        'print_status': isEdit ? submitted.printStatus : 'pending',
-        'is_prep_only': submitted.isPrepOnly,
-      };
-
-      // 1. Immediately save order to Hive and push to Supabase BEFORE opening voucher dialog
       final bool saveSuccess = await OrderRepository().saveOrder(orderMap);
 
-      // 1b. Ensure idempotent voucher record exists for this order
       await VoucherRepository().ensureVoucher(
         orderId: submitted.id,
         orderNumber: submitted.orderNumber,
         voucherType: 'customer',
       );
 
-      if (!mounted) return;
+      if (!mounted) return false;
 
       if (!saveSuccess) {
-        debugPrint('SUBMIT FAILED: saveSuccess was false for ${submitted.id}');
+        debugPrint('PERSIST FAILED: saveSuccess was false for ${submitted.id}');
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Failed to save order locally.'),
             backgroundColor: Colors.red,
           ),
         );
-        return;
+        return false;
       }
 
-      // 2. Update local in-memory order list and clear draft
+      // Mark as persisted for idempotency
+      if (!isEdit) _submittedOrderIds.add(submitted.id);
+
       _saveOrderToMemoryAndClearDraft(submitted, isEdit);
 
-      debugPrint('SUBMIT SUCCESS: ${submitted.id}');
+      debugPrint('PERSIST SUCCESS: ${submitted.id}');
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(isEdit ? 'Order updated successfully!' : 'Order saved successfully!'),
-          backgroundColor: Colors.green,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(isEdit ? 'Order updated successfully!' : 'Order saved successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
 
-      // 3. Open DigitalVoucherDialog after order is already safely persisted
-      _showDigitalVoucherDialog(
-        context,
-        submitted,
-        onConfirmPrint: (imageBytes) async {
-          // Close DigitalVoucherDialog first
-          Navigator.of(context).pop();
-
-          // Show the Print copies confirmation dialog
-          _showPrintOptionsAfterSave(context, submitted, imageBytes, isEdit);
-        },
-        onEdit: () {
-          setState(() {
-            _editingOrder = submitted;
-            _currentTabIndex = 0;
-          });
-          Navigator.of(context).pop();
-        },
-        onCancel: () {
-          Navigator.of(context).pop();
-          _navigateToCalendarTab();
-        },
-      );
+      return true;
     } catch (e) {
-      debugPrint('SUBMIT FAILED: Exception for ${submitted.id} - $e');
-      debugPrint('Database error during order save: $e');
+      debugPrint('PERSIST FAILED: Exception for ${submitted.id} - $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -1333,7 +1274,84 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           ),
         );
       }
+      return false;
     }
+  }
+
+  Future<void> _handleOrderSubmit(Order submitted) async {
+    final bool isEdit = _editingOrder != null;
+
+    if (!isEdit) {
+      debugPrint('CREATE ORDER START (preview): ${submitted.id}');
+    } else {
+      debugPrint('EDIT ORDER START (preview): ${submitted.id}');
+    }
+
+    debugPrint('DEBUG main->DB _handleOrderSubmit: size="${submitted.size}", phone="${submitted.customerPhone}", lettering="${submitted.customLettering}", instructions="${submitted.specialInstructions}"');
+
+    // Build order payload once — shared by all confirmation paths
+    final orderMap = {
+      'id': submitted.id,
+      'order_number': submitted.orderNumber,
+      'delivery_date': submitted.deliveryDate,
+      'delivery_time': submitted.deliveryTime,
+      'item_id': submitted.itemId,
+      'size': submitted.size,
+      'variant': submitted.variant,
+      'design_code': submitted.designCode,
+      'custom_name': submitted.customName,
+      'custom_age': submitted.customAge,
+      'custom_date': submitted.customDate,
+      'custom_lettering': submitted.customLettering,
+      'special_instructions': submitted.specialInstructions,
+      'customer_phone': submitted.customerPhone,
+      'payment_status': submitted.paymentStatus,
+      'deposit_paid': submitted.depositPaid,
+      'remaining_balance': submitted.remainingBalance,
+      'is_kpay': submitted.isKpay,
+      'total_amount': submitted.totalAmount,
+      'toys_cost': submitted.toysCost,
+      'money_pulling_cost': submitted.moneyPullingCost,
+      'money_pulling_note': submitted.moneyPullingNote,
+      'delivery_cost': submitted.deliveryCost,
+      'order_from': submitted.orderFrom,
+      'created_at': submitted.createdAt.toUtc().toIso8601String(),
+      'print_count': submitted.printCount,
+      'print_status': isEdit ? submitted.printStatus : 'pending',
+      'is_prep_only': submitted.isPrepOnly,
+    };
+
+    if (!mounted) return;
+
+    // Open Voucher Preview — NO persistence yet.
+    // Order is only saved when the user explicitly confirms (Print or No Print).
+    _showDigitalVoucherDialog(
+      context,
+      submitted,
+      onConfirmPrint: (imageBytes) async {
+        // Close DigitalVoucherDialog first
+        Navigator.of(context).pop();
+
+        // NOW persist the order (first time save)
+        final saved = await _persistConfirmedOrder(submitted, orderMap, isEdit);
+        if (!saved || !mounted) return;
+
+        // Show the Print copies confirmation dialog
+        _showPrintOptionsAfterSave(context, submitted, imageBytes, isEdit);
+      },
+      onEdit: () {
+        // Return to Order Entry with the current data — no persistence
+        setState(() {
+          _editingOrder = submitted;
+          _currentTabIndex = 0;
+        });
+        Navigator.of(context).pop();
+      },
+      onCancel: () {
+        // Close preview, return to Order Entry — no persistence, draft preserved
+        Navigator.of(context).pop();
+      },
+    );
   }
 
   Widget _buildNavIcon(IconData activeIcon, IconData inactiveIcon, bool isActive) {
@@ -1407,7 +1425,6 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     ];
 
     final List<Map<String, dynamic>> visibleNavs = navConfigs.where((n) => n['visible'] as bool).toList();
-
     final tabs = [
       if (isAdmin || isSale)
         OrderEntryFormTab(

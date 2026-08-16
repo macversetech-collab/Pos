@@ -162,14 +162,9 @@ class BluetoothPrinterService {
       return "PRINTING_IN_PROGRESS";
     }
     _isPrinting = true;
+    bool writeAttempted = false;
 
     try {
-      bool isConnected = await getConnectionStatus();
-      if (!isConnected) {
-        isConnected = await connectToDevice(macAddress);
-      }
-      if (!isConnected) return "CONNECTION_FAILED";
-
       const paperSize = PaperSize.mm80;
       const double width = 576.0;
 
@@ -274,10 +269,17 @@ class BluetoothPrinterService {
         bytes += generator.cut();
       }
       bytes += generator.reset();
+
+      bool isConnected = await getConnectionStatus();
+      if (!isConnected) {
+        isConnected = await connectToDevice(macAddress);
+      }
+      if (!isConnected) return "CONNECTION_FAILED";
       
       // Delay before sending to prevent partial buffer send
       await Future.delayed(const Duration(milliseconds: 100));
 
+      writeAttempted = true;
       bool success = await PrintBluetoothThermal.writeBytes(bytes).timeout(
         const Duration(seconds: 5),
         onTimeout: () {
@@ -297,17 +299,17 @@ class BluetoothPrinterService {
           },
         );
       }
-
-      // Buffer flush delay
-      await Future.delayed(const Duration(milliseconds: 200));
-      await getConnectionStatus();
       
       return success ? "SUCCESS" : "WRITE_BYTES_FAILED";
     } catch (e) {
       debugPrint('Error printing test receipt: $e');
-      await getConnectionStatus();
       return "ERROR: $e";
     } finally {
+      if (writeAttempted) {
+        await Future.delayed(const Duration(milliseconds: 500));
+      }
+      await _internalDisconnect();
+      connectionStatusNotifier.value = false;
       _isPrinting = false;
     }
   }
@@ -382,19 +384,9 @@ class BluetoothPrinterService {
       return "PRINTING_IN_PROGRESS";
     }
     _isPrinting = true;
+    bool writeAttempted = false;
 
     try {
-      // On-demand connection check
-      bool isConnected = await getConnectionStatus();
-      if (!isConnected) {
-        isConnected = await connectToDevice(macAddress);
-      }
-      if (!isConnected) {
-        debugPrint('Could not connect to printer at $macAddress');
-        connectionStatusNotifier.value = false;
-        return "CONNECTION_FAILED";
-      }
-
       const paperSize = PaperSize.mm80;
 
       final img.Image? originalImage = img.decodeImage(imageBytes);
@@ -438,10 +430,22 @@ class BluetoothPrinterService {
       
       bytes += generator.reset();
 
+      // Connect only after the complete printable byte buffer is ready.
+      bool isConnected = await getConnectionStatus();
+      if (!isConnected) {
+        isConnected = await connectToDevice(macAddress);
+      }
+      if (!isConnected) {
+        debugPrint('Could not connect to printer at $macAddress');
+        connectionStatusNotifier.value = false;
+        return "CONNECTION_FAILED";
+      }
+
       // Delay before sending to prevent partial buffer send
       await Future.delayed(const Duration(milliseconds: 100));
 
       // Write raw bytes to printer
+      writeAttempted = true;
       bool success = await PrintBluetoothThermal.writeBytes(bytes).timeout(
         const Duration(seconds: 5),
         onTimeout: () {
@@ -462,16 +466,16 @@ class BluetoothPrinterService {
         );
       }
 
-      // Buffer flush delay
-      await Future.delayed(const Duration(milliseconds: 200));
-      await getConnectionStatus();
-
       return success ? "SUCCESS" : "WRITE_BYTES_FAILED";
     } catch (e) {
       debugPrint('Error printing rasterized receipt: $e');
-      await getConnectionStatus();
       return "ERROR: $e";
     } finally {
+      if (writeAttempted) {
+        await Future.delayed(const Duration(milliseconds: 500));
+      }
+      await _internalDisconnect();
+      connectionStatusNotifier.value = false;
       _isPrinting = false;
     }
   }

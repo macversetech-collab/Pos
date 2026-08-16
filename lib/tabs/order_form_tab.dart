@@ -983,7 +983,7 @@ class _OrderEntryFormTabState extends State<OrderEntryFormTab> {
                   onPressed: () {
                     setState(() {
                       _paymentStatus = 'fully_paid';
-                      _depositPaid = liveTotal;
+                      _depositPaid = (widget.initialOrder != null) ? _depositPaid : liveTotal;
                       _isKpay = tempIsKpay;
                     });
                     calculateTotalPrice();
@@ -1006,10 +1006,12 @@ class _OrderEntryFormTabState extends State<OrderEntryFormTab> {
     final bool isCompact = screenWidth < 380;
 
     int liveTotal = _calculateLiveTotal();
-    if (_paymentStatus == 'fully_paid') {
+    if (_paymentStatus == 'fully_paid' && widget.initialOrder == null) {
       _depositPaid = liveTotal;
     }
-    int liveRemaining = liveTotal - _depositPaid;
+    int liveRemaining = (liveTotal - _depositPaid) > 0 ? (liveTotal - _depositPaid) : 0;
+    final bool isFullyPaidEffective = liveRemaining <= 0 && _depositPaid > 0;
+    final bool isDepositEffective = !isFullyPaidEffective && _depositPaid > 0;
 
     // Adaptive Input rows
     Widget collectionDateWidget = InkWell(
@@ -1756,10 +1758,10 @@ class _OrderEntryFormTabState extends State<OrderEntryFormTab> {
                           Expanded(
                             child: ElevatedButton.icon(
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: _paymentStatus == 'deposit' 
+                                backgroundColor: isDepositEffective || (_paymentStatus == 'deposit' && !isFullyPaidEffective)
                                   ? const Color(0xFF00796B) 
                                   : Colors.white.withValues(alpha: 0.5),
-                                foregroundColor: _paymentStatus == 'deposit'
+                                foregroundColor: isDepositEffective || (_paymentStatus == 'deposit' && !isFullyPaidEffective)
                                   ? Colors.white 
                                   : const Color(0xFF2D241E),
                                 shape: RoundedRectangleBorder(
@@ -1777,10 +1779,10 @@ class _OrderEntryFormTabState extends State<OrderEntryFormTab> {
                           Expanded(
                             child: ElevatedButton.icon(
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: _paymentStatus == 'fully_paid'
+                                backgroundColor: isFullyPaidEffective
                                   ? const Color(0xFF00796B)
                                   : Colors.white.withValues(alpha: 0.5),
-                                foregroundColor: _paymentStatus == 'fully_paid'
+                                foregroundColor: isFullyPaidEffective
                                   ? Colors.white
                                   : const Color(0xFF2D241E),
                                 shape: RoundedRectangleBorder(
@@ -1812,7 +1814,7 @@ class _OrderEntryFormTabState extends State<OrderEntryFormTab> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    _paymentStatus == 'fully_paid' 
+                                    isFullyPaidEffective 
                                       ? 'Fully Paid'
                                       : 'Deposit Paid',
                                     style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF2D241E), fontSize: 14),
@@ -1959,12 +1961,12 @@ class _OrderEntryFormTabState extends State<OrderEntryFormTab> {
                                     Divider(color: Colors.white.withValues(alpha: 0.2)),
                                     const SizedBox(height: 8),
                                     Text(
-                                      _paymentStatus == 'fully_paid'
+                                      liveRemaining <= 0
                                           ? 'STATUS: ရှင်းပြီး'
                                           : 'STATUS: စရံပေး (DUE: ${liveRemaining.toLocaleString()} MMK)',
                                       textAlign: TextAlign.right,
                                       style: TextStyle(
-                                        color: _paymentStatus == 'fully_paid'
+                                        color: liveRemaining <= 0
                                             ? Colors.greenAccent
                                             : Colors.orangeAccent,
                                         fontSize: 12,
@@ -2155,7 +2157,7 @@ class _OrderEntryFormTabState extends State<OrderEntryFormTab> {
         specialInstructions: finalInstructions,
         customerPhone: _customerPhone,
         paymentStatus: _paymentStatus,
-        depositPaid: _paymentStatus == 'fully_paid' ? finalTotal : _depositPaid,
+        depositPaid: (_paymentStatus == 'fully_paid' && widget.initialOrder == null) ? finalTotal : _depositPaid,
         remainingBalance: finalRemaining,
         isKpay: _isKpay,
         totalAmount: finalTotal,
